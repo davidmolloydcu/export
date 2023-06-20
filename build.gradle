@@ -1,3 +1,4 @@
+
 buildscript {
     repositories {
         maven { url "https://repo.grails.org/grails/core" }
@@ -20,13 +21,24 @@ apply plugin: "org.grails.grails-plugin"
 apply plugin: "org.grails.grails-gsp"
 apply plugin: "org.grails.internal.grails-plugin-publish"
 apply plugin: "io.spring.dependency-management"
+apply plugin: 'maven-publish'
+apply plugin: 'signing'
 
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
 
+def codeartifactToken = "aws codeartifact get-authorization-token --domain guru --domain-owner 245150592077 --query authorizationToken --output text".execute().text
+
 repositories {
-    mavenCentral()
+    maven {
+        url "https://guru-245150592077.d.codeartifact.eu-west-1.amazonaws.com/maven/maven/"
+        credentials {
+            username "aws"
+            password System.getenv().getOrDefault('CODEARTIFACT_AUTH_TOKEN', codeartifactToken)
+        }
+    }
     maven { url "https://repo.grails.org/grails/core" }
+    mavenCentral()
 }
 
 dependencyManagement {
@@ -37,26 +49,24 @@ dependencyManagement {
 }
 
 dependencies {
-    provided 'org.springframework.boot:spring-boot-starter-logging'
-    provided "org.springframework.boot:spring-boot-starter-actuator"
-    provided "org.springframework.boot:spring-boot-autoconfigure"
-    provided "org.springframework.boot:spring-boot-starter-tomcat"
+    compileOnly 'org.springframework.boot:spring-boot-starter-logging'
+    compileOnly "org.springframework.boot:spring-boot-starter-actuator"
+    compileOnly "org.springframework.boot:spring-boot-autoconfigure"
+    compileOnly "org.springframework.boot:spring-boot-starter-tomcat"
+    compileOnly "org.grails:grails-web-boot"
+    compileOnly "org.grails:grails-dependencies"
+    compileOnly 'javax.servlet:javax.servlet-api:3.1.0'
 
-    provided "org.grails:grails-web-boot"
-    provided "org.grails:grails-dependencies"
-    provided 'javax.servlet:javax.servlet-api:3.1.0'
+    implementation 'net.sf.opencsv:opencsv:2.3'
+    implementation 'com.lowagie:itext:2.1.7'
+    implementation "com.lowagie:itext-rtf:2.1.7"
+    implementation 'org.odftoolkit:simple-odf:0.6.6'
+    implementation 'net.sourceforge.jexcelapi:jxl:2.6.12'
+    implementation 'commons-beanutils:commons-beanutils:1.8.3'
+    implementation 'commons-codec:commons-codec:1.15'
 
-    compile 'net.sf.opencsv:opencsv:2.3'
-
-    compile 'com.lowagie:itext:2.1.7'
-    compile "com.lowagie:itext-rtf:2.1.7"
-    runtime 'xerces:xercesImpl:2.9.0'
-
-    compile 'org.odftoolkit:simple-odf:0.6.6'
-    compile 'net.sourceforge.jexcelapi:jxl:2.6.12'
-    compile 'commons-beanutils:commons-beanutils:1.8.3'
-
-    testCompile "org.grails:grails-plugin-testing"
+    runtimeOnly 'xerces:xercesImpl:2.9.0'
+    //testImplementation "org.grails:grails-plugin-testing"
 }
 
 grailsPublish {
@@ -66,7 +76,9 @@ grailsPublish {
 
     title = "Grails Export Plugin"
     desc = "This plugin offers export functionality supporting different formats e.g. CSV, Excel, Open Document Spreadsheet, PDF and XML and can be extended to add additional formats."
-
+    websiteUrl="https://www.gurudevelopments.com"
+    issueTrackerUrl = 'http://github.com/myname/myplugin/issues'
+    vcsUrl = 'http://github.com/myname/myplugin'
     developers = [  graemerocher: 'Graeme Rocher',
                     puneetbehl: 'Puneet Behl',
                     nwwells: 'Nathan Wells',
@@ -80,3 +92,74 @@ grailsPublish {
                     frangarcia: 'Fran García',
                     dustindclark: 'Dustin Clark' ]
 }
+
+
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            artifactId = 'export'
+            groupId = 'org.grails.plugins'
+            version = '3.0.1'
+            from components.java
+            versionMapping {
+                usage('java-api') {
+                    fromResolutionOf('runtimeClasspath')
+                }
+                usage('java-runtime') {
+                    fromResolutionResult()
+                }
+            }
+            pom {
+                name = 'export'
+                description = 'A custom fork of the Grails export plugin'
+                url = 'https://www.gurudevelopments.com/'
+                properties = [:]
+                licenses {
+                    license {
+                        name = 'The Apache License, Version 2.0'
+                        url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                    }
+                }
+                developers {
+                    developer {
+                        id = 'gdu'
+                        name = 'Guru Developments'
+                        email = 'gurusupport@dcu.ie'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:git://example.com/my-library.git'
+                    developerConnection = 'scm:git:ssh://example.com/my-library.git'
+                    url = 'http://example.com/my-library/'
+                }
+            }
+        }
+    }
+
+    repositories {
+        maven {
+            url "https://guru-245150592077.d.codeartifact.eu-west-1.amazonaws.com/maven/maven/"
+            credentials {
+                username "aws"
+                password System.getenv().getOrDefault('CODEARTIFACT_AUTH_TOKEN', codeartifactToken)
+            }
+        }
+    }
+
+}
+
+javadoc {
+    if(JavaVersion.current().isJava9Compatible()) {
+        options.addBooleanOption('html5', true)
+    }
+}
+
+
+signing {
+    def signingKey = System.getenv("SIGNING_KEY")
+    def signingPassword = System.getenv("SIGNING_PASSWORD")
+    useInMemoryPgpKeys(signingKey, signingPassword)
+    sign publishing.publications.mavenJava
+}
+
